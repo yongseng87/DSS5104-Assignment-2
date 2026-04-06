@@ -1,6 +1,6 @@
 torch>=2.0.0
 pytorch-tabnet>=4.1
-rtdl==0.0.13
+rtdl_revisiting_models==0.0.2
 scikit-learn>=1.3.0
 xgboost>=2.0.0
 lightgbm>=4.0.0

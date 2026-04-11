@@ -1,0 +1,13 @@
+dataset,1,2,3
+DLmod1_opt,,,11
+DLmod1_seed,,,1
+DLmod2_opt,,,133
+DLmod2_seed,,,29
+XGBoost_opt,,,1
+XGBoost_seed,,,13s
+LightGBM_opt,,,1
+LightGBM_seed,,,11s
+RF_opt,,,10
+RF_seed,,,1
+,,,
+Time recorded in mins (except where specified in secs),,,

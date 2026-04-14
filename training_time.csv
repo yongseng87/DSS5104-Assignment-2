@@ -1,13 +1,11 @@
-dataset,1,2,3
-DLmod1_opt,,,11
-DLmod1_seed,,,1
-DLmod2_opt,,,133
-DLmod2_seed,,,29
-XGBoost_opt,,,1
-XGBoost_seed,,,13s
-LightGBM_opt,,,1
-LightGBM_seed,,,11s
-RF_opt,,,10
-RF_seed,,,1
-,,,
-Time recorded in mins (except where specified in secs),,,
+dataset,1,2,3,3v2
+DLmod1_opt,,,11,24
+DLmod1_seed,,,1,2
+DLmod2_opt,,,133,150
+DLmod2_seed,,,29,22
+Classicmod1_opt,,,1,1
+Classicmod1_seed,,,0.216666667,0.216666667
+Classicmod2_opt,,,1,1
+Classicmod2_seed,,,0.183333333,0.183333333
+Classicmod3_opt,,,10,10
+Classicmod3_seed,,,1,1

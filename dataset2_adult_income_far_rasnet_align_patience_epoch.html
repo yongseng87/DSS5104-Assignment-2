@@ -7530,7 +7530,7 @@ Metrics: <strong>Accuracy</strong>, <strong>AUC-ROC</strong>, <strong>F1</strong
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [53]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [157]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># !pip install pytorch-tabnet "rtdl==0.0.13" optuna xgboost lightgbm ucimlrepo scikit-learn pandas numpy matplotlib seaborn shap</span>
@@ -7571,7 +7571,7 @@ patience = 10</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [54]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [158]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
@@ -7590,6 +7590,9 @@ patience = 10</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">rtdl_revisiting_models</span><span class="w"> </span><span class="kn">import</span> <span class="n">MLP</span><span class="p">,</span> <span class="n">ResNet</span><span class="p">,</span> <span class="n">FTTransformer</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">optuna</span>
 <span class="n">optuna</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">set_verbosity</span><span class="p">(</span><span class="n">optuna</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">psutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">xgboost</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xgb</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">lightgbm</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">lgb</span>
@@ -7623,6 +7626,59 @@ patience = 10</p>
 </div>
 </div>
 </div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=61833780">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Performance-Optimizations-&amp;-Bottleneck-Tracking">Performance Optimizations &amp; Bottleneck Tracking<a class="anchor-link" href="#Performance-Optimizations-&amp;-Bottleneck-Tracking">¶</a></h2><p>A <code>PhaseTimer</code> class tracks wall-clock time for each phase of the training loop so you can see exactly where time is spent.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=d70f7c4c">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [159]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">PhaseTimer</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_totals</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_counts</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_start</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">phase</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_start</span><span class="p">[</span><span class="n">phase</span><span class="p">]</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">phase</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+        <span class="n">elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_start</span><span class="p">[</span><span class="n">phase</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_totals</span><span class="p">[</span><span class="n">phase</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_totals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">phase</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">elapsed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_counts</span><span class="p">[</span><span class="n">phase</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">phase</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_total</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">phase</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_totals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">phase</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">report</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">''</span><span class="p">):</span>
+        <span class="n">total</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_totals</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">--- Bottleneck Report </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2"> ---"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_totals</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="o">-</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">pct</span> <span class="o">=</span> <span class="mi">100</span> <span class="o">*</span> <span class="n">v</span> <span class="o">/</span> <span class="n">total</span> <span class="k">if</span> <span class="n">total</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+            <span class="n">avg</span> <span class="o">=</span> <span class="mi">1000</span> <span class="o">*</span> <span class="n">v</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">_counts</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">k</span><span class="si">:</span><span class="s2">&lt;20</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">v</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">s (</span><span class="si">{</span><span class="n">pct</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%) avg </span><span class="si">{</span><span class="n">avg</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> ms"</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"TOTAL: </span><span class="si">{</span><span class="n">total</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">s</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
 <div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=21920271">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
@@ -7638,7 +7694,7 @@ patience = 10</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [55]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [160]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">SEEDS</span>           <span class="o">=</span> <span class="p">[</span><span class="mi">42</span><span class="p">,</span> <span class="mi">123</span><span class="p">,</span> <span class="mi">456</span><span class="p">]</span>
@@ -7666,7 +7722,7 @@ patience = 10</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [56]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [161]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">"adult.csv"</span><span class="p">,</span> <span class="n">na_values</span><span class="o">=</span><span class="s2">" ?"</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -7738,7 +7794,7 @@ max         99.000000
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [57]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [162]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Target distribution</span>
@@ -7772,7 +7828,7 @@ Name: count, dtype: int64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [58]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [163]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Missing value overview</span>
@@ -7807,7 +7863,7 @@ Name: count, dtype: int64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [59]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [164]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">num_cols_eda</span> <span class="o">=</span> <span class="p">[</span>
@@ -7855,7 +7911,7 @@ Name: count, dtype: int64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [60]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [165]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Raw columns</span>
@@ -7878,7 +7934,7 @@ Name: count, dtype: int64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [61]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [166]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">y_series</span> <span class="o">=</span> <span class="n">y_raw</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">'.'</span><span class="p">,</span> <span class="s1">''</span><span class="p">,</span> <span class="n">regex</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -7912,7 +7968,7 @@ Name: count, dtype: int64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [62]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [167]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">X_proc</span> <span class="o">=</span> <span class="n">X_raw</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
@@ -7992,7 +8048,7 @@ Name: count, dtype: int64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [63]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [168]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Define final column groups after preprocessing</span>
@@ -8027,7 +8083,7 @@ Name: count, dtype: int64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [64]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [169]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">X_train_df</span><span class="p">,</span> <span class="n">X_temp_df</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_temp</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
@@ -8077,7 +8133,7 @@ Name: proportion, dtype: float64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [65]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [170]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Classical models pipeline - logistics regression, random forest, xgboost, lightgbm</span>
@@ -8119,7 +8175,7 @@ Test:  (6513, 100)
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [66]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [177]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Deep learning pipeline ResNet, FT-Transformer</span>
@@ -8205,7 +8261,7 @@ Categorical cardinalities:
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [67]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [172]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"Min categorical value:"</span><span class="p">,</span> <span class="n">X_train_cat</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
@@ -8251,20 +8307,25 @@ Target unique values: [0 1]
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=121e07e0">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=1ceaf130">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [68]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [173]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">set_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">):</span>
     <span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
     <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+
     <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
         <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">manual_seed_all</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+
+    <span class="c1"># improve reproducibility</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">cudnn</span><span class="o">.</span><span class="n">deterministic</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">cudnn</span><span class="o">.</span><span class="n">benchmark</span> <span class="o">=</span> <span class="kc">False</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">compute_classification_metrics</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">,</span> <span class="n">y_prob</span><span class="p">):</span>
     <span class="n">acc</span> <span class="o">=</span> <span class="n">accuracy_score</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">)</span>
@@ -8277,13 +8338,15 @@ Target unique values: [0 1]
     <span class="n">X_num_tr</span><span class="p">,</span> <span class="n">X_cat_tr</span><span class="p">,</span> <span class="n">y_tr</span><span class="p">,</span>
     <span class="n">X_num_v</span><span class="p">,</span> <span class="n">X_cat_v</span><span class="p">,</span> <span class="n">y_v</span><span class="p">,</span>
     <span class="n">lr</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span> <span class="n">n_epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
-    <span class="n">device_</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">patience</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>   <span class="c1"># aligned with Yong Seng</span>
-    <span class="n">use_class_weight</span><span class="o">=</span><span class="kc">True</span>
+    <span class="n">device_</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">patience</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">use_class_weight</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">timer</span><span class="o">=</span><span class="kc">None</span>   <span class="c1"># ⭐ NEW</span>
 <span class="p">):</span>
     <span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device_</span><span class="p">)</span>
 
     <span class="n">optimizer</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">AdamW</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">)</span>
 
+    <span class="c1"># Loss</span>
     <span class="k">if</span> <span class="n">use_class_weight</span><span class="p">:</span>
         <span class="n">pos_weight</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y_tr</span><span class="p">)</span> <span class="o">-</span> <span class="n">y_tr</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span> <span class="o">/</span> <span class="n">y_tr</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
         <span class="n">criterion</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">BCEWithLogitsLoss</span><span class="p">(</span>
@@ -8292,6 +8355,7 @@ Target unique values: [0 1]
     <span class="k">else</span><span class="p">:</span>
         <span class="n">criterion</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">BCEWithLogitsLoss</span><span class="p">()</span>
 
+    <span class="c1"># Convert to tensors</span>
     <span class="n">X_num_tr_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">X_num_tr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device_</span><span class="p">)</span>
     <span class="n">X_cat_tr_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">X_cat_tr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device_</span><span class="p">)</span> <span class="k">if</span> <span class="n">X_cat_tr</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
     <span class="n">y_tr_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">y_tr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device_</span><span class="p">)</span>
@@ -8317,23 +8381,37 @@ Target unique values: [0 1]
             <span class="n">xc</span> <span class="o">=</span> <span class="n">X_cat_tr_t</span><span class="p">[</span><span class="n">b</span><span class="p">]</span> <span class="k">if</span> <span class="n">X_cat_tr_t</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
             <span class="n">yb</span> <span class="o">=</span> <span class="n">y_tr_t</span><span class="p">[</span><span class="n">b</span><span class="p">]</span>
 
-            <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+            <span class="c1"># Forward</span>
+            <span class="k">if</span> <span class="n">timer</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"forward"</span><span class="p">)</span>
             <span class="n">out</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">xn</span><span class="p">,</span> <span class="n">xc</span><span class="p">)</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">timer</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"forward"</span><span class="p">)</span>
+
+            <span class="c1"># Loss</span>
+            <span class="k">if</span> <span class="n">timer</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"loss"</span><span class="p">)</span>
             <span class="n">loss</span> <span class="o">=</span> <span class="n">criterion</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">yb</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">timer</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"loss"</span><span class="p">)</span>
+
+            <span class="c1"># Backward</span>
+            <span class="k">if</span> <span class="n">timer</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"backward"</span><span class="p">)</span>
+            <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
             <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">clip_grad_norm_</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">max_norm</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
             <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">timer</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"backward"</span><span class="p">)</span>
 
             <span class="n">ep_loss</span> <span class="o">+=</span> <span class="n">loss</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
 
         <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
         <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">timer</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"validation"</span><span class="p">)</span>
             <span class="n">vout</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">X_num_v_t</span><span class="p">,</span> <span class="n">X_cat_v_t</span><span class="p">)</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
             <span class="n">vloss</span> <span class="o">=</span> <span class="n">criterion</span><span class="p">(</span><span class="n">vout</span><span class="p">,</span> <span class="n">y_v_t</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">timer</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"validation"</span><span class="p">)</span>
 
         <span class="n">train_losses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ep_loss</span> <span class="o">/</span> <span class="n">n</span><span class="p">)</span>
         <span class="n">val_losses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">vloss</span><span class="p">)</span>
 
+        <span class="c1"># Early stopping</span>
         <span class="k">if</span> <span class="n">vloss</span> <span class="o">&lt;</span> <span class="n">best_val</span><span class="p">:</span>
             <span class="n">best_val</span> <span class="o">=</span> <span class="n">vloss</span>
             <span class="n">best_state</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
@@ -8349,7 +8427,7 @@ Target unique values: [0 1]
 
     <span class="k">return</span> <span class="n">model</span><span class="p">,</span> <span class="n">train_losses</span><span class="p">,</span> <span class="n">val_losses</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">predict_tabular_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">X_num</span><span class="p">,</span> <span class="n">X_cat</span><span class="p">,</span> <span class="n">device_</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">predict_tabular_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">X_num</span><span class="p">,</span> <span class="n">X_cat</span><span class="p">,</span> <span class="n">device_</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">timer</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
     <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
     <span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device_</span><span class="p">)</span>
 
@@ -8363,7 +8441,10 @@ Target unique values: [0 1]
             <span class="n">xn</span> <span class="o">=</span> <span class="n">X_num_t</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span> <span class="o">+</span> <span class="n">batch_size</span><span class="p">]</span>
             <span class="n">xc</span> <span class="o">=</span> <span class="n">X_cat_t</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span> <span class="o">+</span> <span class="n">batch_size</span><span class="p">]</span> <span class="k">if</span> <span class="n">X_cat_t</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
 
+            <span class="k">if</span> <span class="n">timer</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
             <span class="n">out</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">xn</span><span class="p">,</span> <span class="n">xc</span><span class="p">)</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">timer</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
+
             <span class="n">pr</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sigmoid</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
 
             <span class="n">logits</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
@@ -8395,10 +8476,11 @@ Target unique values: [0 1]
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [69]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [174]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">all_results</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">timing_results</span> <span class="o">=</span> <span class="p">[]</span>
 </pre></div>
 </div>
 </div>
@@ -8409,7 +8491,7 @@ Target unique values: [0 1]
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [70]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [175]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">ResidualBlock</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
@@ -8545,12 +8627,20 @@ Target unique values: [0 1]
 
     <span class="k">return</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_val_np</span><span class="p">,</span> <span class="n">val_probs</span><span class="p">)</span>
 
+<span class="n">timer</span> <span class="o">=</span> <span class="n">PhaseTimer</span><span class="p">()</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
+
 <span class="n">study_resnet</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span>
     <span class="n">direction</span><span class="o">=</span><span class="s2">"maximize"</span><span class="p">,</span>
     <span class="n">sampler</span><span class="o">=</span><span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">TPESampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
 <span class="p">)</span>
 
 <span class="n">study_resnet</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">resnet_clf_objective</span><span class="p">,</span> <span class="n">n_trials</span><span class="o">=</span><span class="n">N_OPTUNA_TRIALS</span><span class="p">)</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
+
+<span class="n">optuna_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
 
 <span class="n">best_resnet</span> <span class="o">=</span> <span class="n">study_resnet</span><span class="o">.</span><span class="n">best_params</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Best ResNet params:"</span><span class="p">)</span>
@@ -8580,22 +8670,28 @@ Best ResNet params:
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [71]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [199]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Training ResNet across seeds..."</span><span class="p">)</span>
+
+<span class="n">train_time_total</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">inference_time_total</span> <span class="o">=</span> <span class="mi">0</span>
 
 <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">SEEDS</span><span class="p">:</span>
     <span class="n">set_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 
     <span class="n">model</span> <span class="o">=</span> <span class="n">TabularResNet</span><span class="p">(</span>
-        <span class="n">n_num_features</span><span class="o">=</span><span class="n">X_train_num</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
-        <span class="n">cat_cardinalities</span><span class="o">=</span><span class="n">cat_cardinalities</span><span class="p">,</span>
-        <span class="n">d_embedding</span><span class="o">=</span><span class="n">best_resnet</span><span class="p">[</span><span class="s2">"d_embedding"</span><span class="p">],</span>
-        <span class="n">d_hidden</span><span class="o">=</span><span class="n">best_resnet</span><span class="p">[</span><span class="s2">"d_hidden"</span><span class="p">],</span>
-        <span class="n">n_blocks</span><span class="o">=</span><span class="n">best_resnet</span><span class="p">[</span><span class="s2">"n_blocks"</span><span class="p">],</span>
-        <span class="n">dropout</span><span class="o">=</span><span class="n">best_resnet</span><span class="p">[</span><span class="s2">"dropout"</span><span class="p">]</span>
-    <span class="p">)</span>
+    <span class="n">n_num_features</span><span class="o">=</span><span class="n">X_train_num</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+    <span class="n">cat_cardinalities</span><span class="o">=</span><span class="n">cat_cardinalities</span><span class="p">,</span>
+    <span class="n">d_embedding</span><span class="o">=</span><span class="n">best_resnet</span><span class="p">[</span><span class="s2">"d_embedding"</span><span class="p">],</span>
+    <span class="n">d_hidden</span><span class="o">=</span><span class="n">best_resnet</span><span class="p">[</span><span class="s2">"d_hidden"</span><span class="p">],</span>
+    <span class="n">n_blocks</span><span class="o">=</span><span class="n">best_resnet</span><span class="p">[</span><span class="s2">"n_blocks"</span><span class="p">],</span>
+    <span class="n">dropout</span><span class="o">=</span><span class="n">best_resnet</span><span class="p">[</span><span class="s2">"dropout"</span><span class="p">]</span>
+<span class="p">)</span>
+
+    <span class="c1"># TRAINING TIME</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
 
     <span class="n">model</span><span class="p">,</span> <span class="n">train_losses</span><span class="p">,</span> <span class="n">val_losses</span> <span class="o">=</span> <span class="n">train_tabular_model</span><span class="p">(</span>
         <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
@@ -8609,16 +8705,24 @@ Best ResNet params:
         <span class="n">n_epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
         <span class="n">batch_size</span><span class="o">=</span><span class="n">best_resnet</span><span class="p">[</span><span class="s2">"batch_size"</span><span class="p">],</span>
         <span class="n">device_</span><span class="o">=</span><span class="n">device_</span><span class="p">,</span>
-        <span class="n">patience</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>   <span class="c1"># aligned with Yong Seng</span>
-        <span class="n">use_class_weight</span><span class="o">=</span><span class="kc">True</span>
+        <span class="n">patience</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">use_class_weight</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">timer</span><span class="o">=</span><span class="n">timer</span>   <span class="c1"># ⭐ IMPORTANT</span>
     <span class="p">)</span>
+
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
+
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
 
     <span class="n">_</span><span class="p">,</span> <span class="n">test_probs</span><span class="p">,</span> <span class="n">test_preds</span> <span class="o">=</span> <span class="n">predict_tabular_model</span><span class="p">(</span>
         <span class="n">model</span><span class="p">,</span>
         <span class="n">X_test_num</span><span class="p">,</span>
         <span class="n">X_test_cat</span><span class="p">,</span>
-        <span class="n">device_</span><span class="o">=</span><span class="n">device_</span>
+        <span class="n">device_</span><span class="o">=</span><span class="n">device_</span><span class="p">,</span>
+        <span class="n">timer</span><span class="o">=</span><span class="n">timer</span>   <span class="c1"># ⭐ IMPORTANT</span>
     <span class="p">)</span>
+
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
 
     <span class="n">acc</span><span class="p">,</span> <span class="n">auc</span><span class="p">,</span> <span class="n">f1</span> <span class="o">=</span> <span class="n">compute_classification_metrics</span><span class="p">(</span>
         <span class="n">y_test_np</span><span class="p">,</span> <span class="n">test_preds</span><span class="p">,</span> <span class="n">test_probs</span>
@@ -8655,12 +8759,71 @@ Seed 456: Acc=0.7915, AUC=0.9032, F1=0.6686
 </div>
 </div>
 </div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=60802689">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [200]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">train_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
+<span class="n">inference_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
+
+<span class="n">timing_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+    <span class="s2">"method"</span><span class="p">:</span> <span class="s2">"ResNet"</span><span class="p">,</span>
+    <span class="s2">"optuna_time"</span><span class="p">:</span> <span class="n">optuna_time</span><span class="p">,</span>
+    <span class="s2">"train_time"</span><span class="p">:</span> <span class="n">train_time</span><span class="p">,</span>
+    <span class="s2">"inference_time"</span><span class="p">:</span> <span class="n">inference_time</span>
+<span class="p">})</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2ab7d3a4">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [201]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">timer</span><span class="o">.</span><span class="n">report</span><span class="p">(</span><span class="s2">"ResNet"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>
+--- Bottleneck Report ResNet ---
+train                179.592s (49.8%) avg 29932.04 ms
+forward              97.096s (26.9%) avg 16.94 ms
+backward             76.303s (21.1%) avg 13.31 ms
+optuna               4.131s (1.1%) avg 4131.44 ms
+validation           2.367s (0.7%) avg 16.10 ms
+loss                 1.085s (0.3%) avg 0.19 ms
+inference            0.294s (0.1%) avg 6.52 ms
+TOTAL: 360.868s
+
+</pre>
+</div>
+</div>
+</div>
+</div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f2da3e83">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [72]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [202]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">results_resnet</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">all_results</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s2">"method"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"ResNet"</span><span class="p">])</span>
@@ -8724,7 +8887,7 @@ dtype: float64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [73]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [203]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># FT-Transformer tuning</span>
@@ -8779,6 +8942,9 @@ dtype: float64
 
     <span class="k">return</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_val_np</span><span class="p">,</span> <span class="n">val_probs</span><span class="p">)</span>
 
+<span class="n">timer</span> <span class="o">=</span> <span class="n">PhaseTimer</span><span class="p">()</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
 
 <span class="n">study_ft</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span>
     <span class="n">direction</span><span class="o">=</span><span class="s1">'maximize'</span><span class="p">,</span>
@@ -8786,6 +8952,10 @@ dtype: float64
 <span class="p">)</span>
 
 <span class="n">study_ft</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">ft_clf_objective</span><span class="p">,</span> <span class="n">n_trials</span><span class="o">=</span><span class="n">N_OPTUNA_TRIALS</span><span class="p">)</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
+
+<span class="n">optuna_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
 
 <span class="n">best_ft</span> <span class="o">=</span> <span class="n">study_ft</span><span class="o">.</span><span class="n">best_params</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Best FT-Transformer params:"</span><span class="p">)</span>
@@ -8815,18 +8985,16 @@ Best FT-Transformer params:
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [96]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [204]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Training FT-Transformer across seeds..."</span><span class="p">)</span>
-
-<span class="n">ft_train_curves</span> <span class="o">=</span> <span class="p">{}</span>
 
 <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">SEEDS</span><span class="p">:</span>
     <span class="n">set_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 
     <span class="n">model</span> <span class="o">=</span> <span class="n">FTTransformer</span><span class="p">(</span>
-        <span class="n">n_cont_features</span><span class="o">=</span><span class="n">n_num_ft</span><span class="p">,</span>
+        <span class="n">n_cont_features</span><span class="o">=</span><span class="n">X_train_num</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
         <span class="n">cat_cardinalities</span><span class="o">=</span><span class="n">cat_cardinalities</span><span class="p">,</span>
         <span class="n">d_out</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
         <span class="n">n_blocks</span><span class="o">=</span><span class="n">best_ft</span><span class="p">[</span><span class="s1">'n_blocks'</span><span class="p">],</span>
@@ -8838,34 +9006,38 @@ Best FT-Transformer params:
         <span class="n">residual_dropout</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="n">model</span><span class="p">,</span> <span class="n">train_losses</span><span class="p">,</span> <span class="n">val_losses</span> <span class="o">=</span> <span class="n">train_tabular_model</span><span class="p">(</span>
-        <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
-        <span class="n">X_num_tr</span><span class="o">=</span><span class="n">X_train_num</span><span class="p">,</span>
-        <span class="n">X_cat_tr</span><span class="o">=</span><span class="n">X_train_cat</span><span class="p">,</span>
-        <span class="n">y_tr</span><span class="o">=</span><span class="n">y_train_np</span><span class="p">,</span>
-        <span class="n">X_num_v</span><span class="o">=</span><span class="n">X_val_num</span><span class="p">,</span>
-        <span class="n">X_cat_v</span><span class="o">=</span><span class="n">X_val_cat</span><span class="p">,</span>
-        <span class="n">y_v</span><span class="o">=</span><span class="n">y_val_np</span><span class="p">,</span>
+    <span class="c1"># TRAIN</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
+
+    <span class="n">model</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">train_tabular_model</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">,</span>
+        <span class="n">X_train_num</span><span class="p">,</span> <span class="n">X_train_cat</span><span class="p">,</span> <span class="n">y_train_np</span><span class="p">,</span>
+        <span class="n">X_val_num</span><span class="p">,</span> <span class="n">X_val_cat</span><span class="p">,</span> <span class="n">y_val_np</span><span class="p">,</span>
         <span class="n">lr</span><span class="o">=</span><span class="n">best_ft</span><span class="p">[</span><span class="s1">'lr'</span><span class="p">],</span>
-        <span class="n">n_epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
         <span class="n">batch_size</span><span class="o">=</span><span class="n">best_ft</span><span class="p">[</span><span class="s1">'batch_size'</span><span class="p">],</span>
         <span class="n">device_</span><span class="o">=</span><span class="n">device_</span><span class="p">,</span>
         <span class="n">patience</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-        <span class="n">use_class_weight</span><span class="o">=</span><span class="kc">True</span>
+        <span class="n">use_class_weight</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">timer</span><span class="o">=</span><span class="n">timer</span>
     <span class="p">)</span>
 
-    <span class="c1"># Save curves for plotting later</span>
-    <span class="n">ft_train_curves</span><span class="p">[</span><span class="n">seed</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">train_losses</span><span class="p">,</span> <span class="n">val_losses</span><span class="p">)</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
 
-    <span class="n">_</span><span class="p">,</span> <span class="n">test_probs</span><span class="p">,</span> <span class="n">test_preds</span> <span class="o">=</span> <span class="n">predict_tabular_model</span><span class="p">(</span>
-        <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
-        <span class="n">X_num</span><span class="o">=</span><span class="n">X_test_num</span><span class="p">,</span>
-        <span class="n">X_cat</span><span class="o">=</span><span class="n">X_test_cat</span><span class="p">,</span>
-        <span class="n">device_</span><span class="o">=</span><span class="n">device_</span>
+    <span class="c1"># INFERENCE</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
+
+    <span class="n">_</span><span class="p">,</span> <span class="n">probs</span><span class="p">,</span> <span class="n">preds</span> <span class="o">=</span> <span class="n">predict_tabular_model</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">,</span>
+        <span class="n">X_test_num</span><span class="p">,</span>
+        <span class="n">X_test_cat</span><span class="p">,</span>
+        <span class="n">device_</span><span class="p">,</span>
+        <span class="n">timer</span><span class="o">=</span><span class="n">timer</span>
     <span class="p">)</span>
+
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
 
     <span class="n">acc</span><span class="p">,</span> <span class="n">auc</span><span class="p">,</span> <span class="n">f1</span> <span class="o">=</span> <span class="n">compute_classification_metrics</span><span class="p">(</span>
-        <span class="n">y_test_np</span><span class="p">,</span> <span class="n">test_preds</span><span class="p">,</span> <span class="n">test_probs</span>
+        <span class="n">y_test_np</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">probs</span>
     <span class="p">)</span>
 
     <span class="n">all_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
@@ -8904,7 +9076,7 @@ Seed 456: Acc=0.7927, AUC=0.9096, F1=0.6714
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [75]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [205]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">results_ft</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">all_results</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'method'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'FT-Transformer'</span><span class="p">])</span>
@@ -8952,6 +9124,50 @@ dtype: float64
 </div>
 </div>
 </div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8230bacb">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [206]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">timing_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+    <span class="s1">'method'</span><span class="p">:</span> <span class="s1">'FT-Transformer'</span><span class="p">,</span>
+    <span class="s1">'optuna_time'</span><span class="p">:</span> <span class="n">optuna_time</span><span class="p">,</span>
+    <span class="s1">'train_time'</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"train"</span><span class="p">),</span>
+    <span class="s1">'inference_time'</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
+<span class="p">})</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">report</span><span class="p">(</span><span class="s2">"FT-Transformer"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>
+--- Bottleneck Report FT-Transformer ---
+optuna               5335.480s (86.7%) avg 5335480.11 ms
+train                410.953s (6.7%) avg 136984.23 ms
+backward             259.165s (4.2%) avg 31.37 ms
+forward              136.143s (2.2%) avg 16.48 ms
+validation           11.879s (0.2%) avg 219.98 ms
+loss                 2.695s (0.0%) avg 0.33 ms
+inference            1.043s (0.0%) avg 24.83 ms
+TOTAL: 6157.357s
+
+</pre>
+</div>
+</div>
+</div>
+</div>
 </div>
 <div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2e032255">
 <div class="jp-Cell-inputWrapper" tabindex="0">
@@ -8968,7 +9184,7 @@ dtype: float64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [76]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [207]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Class imbalance ratio</span>
@@ -9006,6 +9222,9 @@ dtype: float64
     <span class="n">val_probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_val_c</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
     <span class="k">return</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_val_np</span><span class="p">,</span> <span class="n">val_probs</span><span class="p">)</span>
 
+<span class="n">timer</span> <span class="o">=</span> <span class="n">PhaseTimer</span><span class="p">()</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
 
 <span class="n">study_xgb</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span>
     <span class="n">direction</span><span class="o">=</span><span class="s1">'maximize'</span><span class="p">,</span>
@@ -9013,6 +9232,10 @@ dtype: float64
 <span class="p">)</span>
 
 <span class="n">study_xgb</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">xgb_clf_objective</span><span class="p">,</span> <span class="n">n_trials</span><span class="o">=</span><span class="n">N_OPTUNA_TRIALS</span><span class="p">)</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
+
+<span class="n">optuna_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
 
 <span class="n">best_xgb</span> <span class="o">=</span> <span class="n">study_xgb</span><span class="o">.</span><span class="n">best_params</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Best XGBoost params:"</span><span class="p">)</span>
@@ -9043,37 +9266,33 @@ Best XGBoost params:
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [77]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [208]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"Training XGBoost across seeds..."</span><span class="p">)</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Training XGBoost across seeds..."</span><span class="p">)</span>
 
 <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">SEEDS</span><span class="p">:</span>
     <span class="n">set_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 
     <span class="n">model</span> <span class="o">=</span> <span class="n">xgb</span><span class="o">.</span><span class="n">XGBClassifier</span><span class="p">(</span>
-        <span class="n">n_estimators</span><span class="o">=</span><span class="n">best_xgb</span><span class="p">[</span><span class="s1">'n_estimators'</span><span class="p">],</span>
-        <span class="n">max_depth</span><span class="o">=</span><span class="n">best_xgb</span><span class="p">[</span><span class="s1">'max_depth'</span><span class="p">],</span>
-        <span class="n">learning_rate</span><span class="o">=</span><span class="n">best_xgb</span><span class="p">[</span><span class="s1">'learning_rate'</span><span class="p">],</span>
-        <span class="n">subsample</span><span class="o">=</span><span class="n">best_xgb</span><span class="p">[</span><span class="s1">'subsample'</span><span class="p">],</span>
-        <span class="n">colsample_bytree</span><span class="o">=</span><span class="n">best_xgb</span><span class="p">[</span><span class="s1">'colsample_bytree'</span><span class="p">],</span>
-        <span class="n">min_child_weight</span><span class="o">=</span><span class="n">best_xgb</span><span class="p">[</span><span class="s1">'min_child_weight'</span><span class="p">],</span>
-        <span class="n">gamma</span><span class="o">=</span><span class="n">best_xgb</span><span class="p">[</span><span class="s1">'gamma'</span><span class="p">],</span>
-        <span class="n">reg_alpha</span><span class="o">=</span><span class="n">best_xgb</span><span class="p">[</span><span class="s1">'reg_alpha'</span><span class="p">],</span>
-        <span class="n">reg_lambda</span><span class="o">=</span><span class="n">best_xgb</span><span class="p">[</span><span class="s1">'reg_lambda'</span><span class="p">],</span>
-        <span class="n">scale_pos_weight</span><span class="o">=</span><span class="n">best_xgb</span><span class="p">[</span><span class="s1">'scale_pos_weight'</span><span class="p">],</span>
-        <span class="n">random_state</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
-        <span class="n">eval_metric</span><span class="o">=</span><span class="s1">'auc'</span><span class="p">,</span>
-        <span class="n">verbosity</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
-        <span class="n">tree_method</span><span class="o">=</span><span class="s1">'hist'</span>
+        <span class="o">**</span><span class="n">best_xgb</span><span class="p">,</span>
+        <span class="n">random_state</span><span class="o">=</span><span class="n">seed</span>
     <span class="p">)</span>
 
+    <span class="c1"># TRAIN</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
     <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train_c</span><span class="p">,</span> <span class="n">y_train_np</span><span class="p">)</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
 
+    <span class="c1"># INFERENCE</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
     <span class="n">preds</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test_c</span><span class="p">)</span>
     <span class="n">probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test_c</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
 
-    <span class="n">acc</span><span class="p">,</span> <span class="n">auc</span><span class="p">,</span> <span class="n">f1</span> <span class="o">=</span> <span class="n">compute_classification_metrics</span><span class="p">(</span><span class="n">y_test_np</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">probs</span><span class="p">)</span>
+    <span class="n">acc</span><span class="p">,</span> <span class="n">auc</span><span class="p">,</span> <span class="n">f1</span> <span class="o">=</span> <span class="n">compute_classification_metrics</span><span class="p">(</span>
+        <span class="n">y_test_np</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">probs</span>
+    <span class="p">)</span>
 
     <span class="n">all_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
         <span class="s1">'method'</span><span class="p">:</span> <span class="s1">'XGBoost'</span><span class="p">,</span>
@@ -9096,7 +9315,8 @@ Best XGBoost params:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Training XGBoost across seeds...
+<pre>
+Training XGBoost across seeds...
 Seed 42: Acc=0.8217, AUC=0.9256, F1=0.7024
 Seed 123: Acc=0.8240, AUC=0.9257, F1=0.7051
 Seed 456: Acc=0.8227, AUC=0.9257, F1=0.7033
@@ -9110,7 +9330,7 @@ Seed 456: Acc=0.8227, AUC=0.9257, F1=0.7033
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [78]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [209]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">results_xgb</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">all_results</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'method'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'XGBoost'</span><span class="p">])</span>
@@ -9141,6 +9361,9 @@ Per-seed XGBoost results:
 0  XGBoost    42  0.821741  0.925632  0.702384
 1  XGBoost   123  0.824044  0.925671  0.705095
 2  XGBoost   456  0.822662  0.925693  0.703314
+3  XGBoost    42  0.821741  0.925632  0.702384
+4  XGBoost   123  0.824044  0.925671  0.705095
+5  XGBoost   456  0.822662  0.925693  0.703314
 
 XGBoost mean performance:
 accuracy    0.822816
@@ -9149,10 +9372,50 @@ f1          0.703598
 dtype: float64
 
 XGBoost std performance:
-accuracy    0.001159
-auc         0.000031
-f1          0.001378
+accuracy    0.001037
+auc         0.000027
+f1          0.001232
 dtype: float64
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c9aadcb2">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [210]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">timing_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+    <span class="s1">'method'</span><span class="p">:</span> <span class="s1">'XGBoost'</span><span class="p">,</span>
+    <span class="s1">'optuna_time'</span><span class="p">:</span> <span class="n">optuna_time</span><span class="p">,</span>
+    <span class="s1">'train_time'</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"train"</span><span class="p">),</span>
+    <span class="s1">'inference_time'</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
+<span class="p">})</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">report</span><span class="p">(</span><span class="s2">"XGBoost"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>
+--- Bottleneck Report XGBoost ---
+optuna               13.004s (85.9%) avg 13004.13 ms
+train                1.988s (13.1%) avg 662.54 ms
+inference            0.139s (0.9%) avg 46.26 ms
+TOTAL: 15.131s
+
 </pre>
 </div>
 </div>
@@ -9174,7 +9437,7 @@ dtype: float64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [79]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [211]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Class imbalance ratio</span>
@@ -9213,12 +9476,20 @@ dtype: float64
     <span class="k">return</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_val_np</span><span class="p">,</span> <span class="n">val_probs</span><span class="p">)</span>
 
 
+<span class="n">timer</span> <span class="o">=</span> <span class="n">PhaseTimer</span><span class="p">()</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
+
 <span class="n">study_lgb</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span>
     <span class="n">direction</span><span class="o">=</span><span class="s1">'maximize'</span><span class="p">,</span>
     <span class="n">sampler</span><span class="o">=</span><span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">TPESampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
 <span class="p">)</span>
 
 <span class="n">study_lgb</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">lgb_objective</span><span class="p">,</span> <span class="n">n_trials</span><span class="o">=</span><span class="n">N_OPTUNA_TRIALS</span><span class="p">)</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
+
+<span class="n">optuna_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
 
 <span class="n">best_lgb</span> <span class="o">=</span> <span class="n">study_lgb</span><span class="o">.</span><span class="n">best_params</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Best LightGBM params:"</span><span class="p">)</span>
@@ -9249,37 +9520,34 @@ Best LightGBM params:
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [80]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [212]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"Training LightGBM across seeds..."</span><span class="p">)</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Training LightGBM across seeds..."</span><span class="p">)</span>
 
 <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">SEEDS</span><span class="p">:</span>
     <span class="n">set_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 
     <span class="n">model</span> <span class="o">=</span> <span class="n">lgb</span><span class="o">.</span><span class="n">LGBMClassifier</span><span class="p">(</span>
-        <span class="n">n_estimators</span><span class="o">=</span><span class="n">best_lgb</span><span class="p">[</span><span class="s1">'n_estimators'</span><span class="p">],</span>
-        <span class="n">num_leaves</span><span class="o">=</span><span class="n">best_lgb</span><span class="p">[</span><span class="s1">'num_leaves'</span><span class="p">],</span>
-        <span class="n">learning_rate</span><span class="o">=</span><span class="n">best_lgb</span><span class="p">[</span><span class="s1">'learning_rate'</span><span class="p">],</span>
-        <span class="n">subsample</span><span class="o">=</span><span class="n">best_lgb</span><span class="p">[</span><span class="s1">'subsample'</span><span class="p">],</span>
-        <span class="n">colsample_bytree</span><span class="o">=</span><span class="n">best_lgb</span><span class="p">[</span><span class="s1">'colsample_bytree'</span><span class="p">],</span>
-        <span class="n">min_child_samples</span><span class="o">=</span><span class="n">best_lgb</span><span class="p">[</span><span class="s1">'min_child_samples'</span><span class="p">],</span>
-        <span class="n">reg_alpha</span><span class="o">=</span><span class="n">best_lgb</span><span class="p">[</span><span class="s1">'reg_alpha'</span><span class="p">],</span>
-        <span class="n">reg_lambda</span><span class="o">=</span><span class="n">best_lgb</span><span class="p">[</span><span class="s1">'reg_lambda'</span><span class="p">],</span>
-        <span class="n">scale_pos_weight</span><span class="o">=</span><span class="n">best_lgb</span><span class="p">[</span><span class="s1">'scale_pos_weight'</span><span class="p">],</span>
-        <span class="n">objective</span><span class="o">=</span><span class="s1">'binary'</span><span class="p">,</span>
-        <span class="n">metric</span><span class="o">=</span><span class="s1">'auc'</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">best_lgb</span><span class="p">,</span>
         <span class="n">random_state</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
-        <span class="n">verbosity</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
-        <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span>
+        <span class="n">n_jobs</span><span class="o">=</span><span class="mi">1</span>
     <span class="p">)</span>
 
+    <span class="c1"># TRAIN</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
     <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train_c</span><span class="p">,</span> <span class="n">y_train_np</span><span class="p">)</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
 
+    <span class="c1"># INFERENCE</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
     <span class="n">preds</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test_c</span><span class="p">)</span>
     <span class="n">probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test_c</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
 
-    <span class="n">acc</span><span class="p">,</span> <span class="n">auc</span><span class="p">,</span> <span class="n">f1</span> <span class="o">=</span> <span class="n">compute_classification_metrics</span><span class="p">(</span><span class="n">y_test_np</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">probs</span><span class="p">)</span>
+    <span class="n">acc</span><span class="p">,</span> <span class="n">auc</span><span class="p">,</span> <span class="n">f1</span> <span class="o">=</span> <span class="n">compute_classification_metrics</span><span class="p">(</span>
+        <span class="n">y_test_np</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">probs</span>
+    <span class="p">)</span>
 
     <span class="n">all_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
         <span class="s1">'method'</span><span class="p">:</span> <span class="s1">'LightGBM'</span><span class="p">,</span>
@@ -9302,10 +9570,51 @@ Best LightGBM params:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Training LightGBM across seeds...
+<pre>
+Training LightGBM across seeds...
 Seed 42: Acc=0.8475, AUC=0.9261, F1=0.7205
 Seed 123: Acc=0.8472, AUC=0.9262, F1=0.7211
 Seed 456: Acc=0.8474, AUC=0.9260, F1=0.7209
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0c64045d">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [213]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">timing_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+    <span class="s1">'method'</span><span class="p">:</span> <span class="s1">'LightGBM'</span><span class="p">,</span>
+    <span class="s1">'optuna_time'</span><span class="p">:</span> <span class="n">optuna_time</span><span class="p">,</span>
+    <span class="s1">'train_time'</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"train"</span><span class="p">),</span>
+    <span class="s1">'inference_time'</span><span class="p">:</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
+<span class="p">})</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">report</span><span class="p">(</span><span class="s2">"LightGBM"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>
+--- Bottleneck Report LightGBM ---
+optuna               16.167s (83.4%) avg 16166.54 ms
+train                2.176s (11.2%) avg 725.45 ms
+inference            1.046s (5.4%) avg 348.79 ms
+TOTAL: 19.389s
+
 </pre>
 </div>
 </div>
@@ -9316,7 +9625,7 @@ Seed 456: Acc=0.8474, AUC=0.9260, F1=0.7209
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [81]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [214]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">results_lgb</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">all_results</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'method'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'LightGBM'</span><span class="p">])</span>
@@ -9347,6 +9656,9 @@ Per-seed LightGBM results:
 0  LightGBM    42  0.847536  0.926116  0.720518
 1  LightGBM   123  0.847229  0.926197  0.721054
 2  LightGBM   456  0.847382  0.925999  0.720943
+3  LightGBM    42  0.847536  0.926116  0.720518
+4  LightGBM   123  0.847229  0.926197  0.721054
+5  LightGBM   456  0.847382  0.925999  0.720943
 
 LightGBM mean performance:
 accuracy    0.847382
@@ -9355,9 +9667,9 @@ f1          0.720838
 dtype: float64
 
 LightGBM std performance:
-accuracy    0.000154
-auc         0.000099
-f1          0.000283
+accuracy    0.000137
+auc         0.000089
+f1          0.000253
 dtype: float64
 </pre>
 </div>
@@ -9380,7 +9692,7 @@ dtype: float64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [82]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [215]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">rf_clf_objective</span><span class="p">(</span><span class="n">trial</span><span class="p">):</span>
@@ -9403,6 +9715,9 @@ dtype: float64
     <span class="n">val_probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_val_c</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
     <span class="k">return</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_val_np</span><span class="p">,</span> <span class="n">val_probs</span><span class="p">)</span>
 
+<span class="n">timer</span> <span class="o">=</span> <span class="n">PhaseTimer</span><span class="p">()</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
 
 <span class="n">study_rf</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span>
     <span class="n">direction</span><span class="o">=</span><span class="s1">'maximize'</span><span class="p">,</span>
@@ -9410,6 +9725,10 @@ dtype: float64
 <span class="p">)</span>
 
 <span class="n">study_rf</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">rf_clf_objective</span><span class="p">,</span> <span class="n">n_trials</span><span class="o">=</span><span class="n">N_OPTUNA_TRIALS</span><span class="p">)</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
+
+<span class="n">optuna_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
 
 <span class="n">best_rf</span> <span class="o">=</span> <span class="n">study_rf</span><span class="o">.</span><span class="n">best_params</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Best RF params:"</span><span class="p">)</span>
@@ -9439,10 +9758,10 @@ Best RF params:
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [83]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [216]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"Training Random Forest across seeds..."</span><span class="p">)</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Training Random Forest across seeds..."</span><span class="p">)</span>
 
 <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">SEEDS</span><span class="p">:</span>
     <span class="n">set_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
@@ -9458,12 +9777,20 @@ Best RF params:
         <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span>
     <span class="p">)</span>
 
+     <span class="c1"># TRAINING TIME</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
     <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train_c</span><span class="p">,</span> <span class="n">y_train_np</span><span class="p">)</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
 
+    <span class="c1"># INFERENCE TIME</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
     <span class="n">preds</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test_c</span><span class="p">)</span>
     <span class="n">probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test_c</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
 
-    <span class="n">acc</span><span class="p">,</span> <span class="n">auc</span><span class="p">,</span> <span class="n">f1</span> <span class="o">=</span> <span class="n">compute_classification_metrics</span><span class="p">(</span><span class="n">y_test_np</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">probs</span><span class="p">)</span>
+    <span class="n">acc</span><span class="p">,</span> <span class="n">auc</span><span class="p">,</span> <span class="n">f1</span> <span class="o">=</span> <span class="n">compute_classification_metrics</span><span class="p">(</span>
+        <span class="n">y_test_np</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">probs</span>
+    <span class="p">)</span>
 
     <span class="n">all_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
         <span class="s1">'method'</span><span class="p">:</span> <span class="s1">'RandomForest'</span><span class="p">,</span>
@@ -9486,11 +9813,34 @@ Best RF params:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Training Random Forest across seeds...
+<pre>
+Training Random Forest across seeds...
 Seed 42: Acc=0.8615, AUC=0.9160, F1=0.6826
 Seed 123: Acc=0.8626, AUC=0.9162, F1=0.6854
 Seed 456: Acc=0.8637, AUC=0.9153, F1=0.6882
 </pre>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=8e3cd842">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [217]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">train_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
+<span class="n">inference_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
+
+<span class="n">timing_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+    <span class="s1">'method'</span><span class="p">:</span> <span class="s1">'RandomForest'</span><span class="p">,</span>
+    <span class="s1">'optuna_time'</span><span class="p">:</span> <span class="n">optuna_time</span><span class="p">,</span>
+    <span class="s1">'train_time'</span><span class="p">:</span> <span class="n">train_time</span><span class="p">,</span>
+    <span class="s1">'inference_time'</span><span class="p">:</span> <span class="n">inference_time</span>
+<span class="p">})</span>
+</pre></div>
 </div>
 </div>
 </div>
@@ -9500,7 +9850,7 @@ Seed 456: Acc=0.8637, AUC=0.9153, F1=0.6882
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [84]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [218]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">results_rf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">all_results</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'method'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'RandomForest'</span><span class="p">])</span>
@@ -9531,6 +9881,9 @@ Per-seed Random Forest results:
 0  RandomForest    42  0.861508  0.916031  0.682618
 1  RandomForest   123  0.862583  0.916170  0.685413
 2  RandomForest   456  0.863657  0.915330  0.688202
+3  RandomForest    42  0.861508  0.916031  0.682618
+4  RandomForest   123  0.862583  0.916170  0.685413
+5  RandomForest   456  0.863657  0.915330  0.688202
 
 Random Forest mean performance:
 accuracy    0.862583
@@ -9539,10 +9892,43 @@ f1          0.685411
 dtype: float64
 
 Random Forest std performance:
-accuracy    0.001075
-auc         0.000450
-f1          0.002792
+accuracy    0.000961
+auc         0.000403
+f1          0.002497
 dtype: float64
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=be480e70">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [219]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">timer</span><span class="o">.</span><span class="n">report</span><span class="p">(</span><span class="s2">"Random Forest"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>
+--- Bottleneck Report Random Forest ---
+optuna               43.154s (82.6%) avg 43153.95 ms
+train                8.332s (16.0%) avg 2777.33 ms
+inference            0.751s (1.4%) avg 250.31 ms
+TOTAL: 52.237s
+
 </pre>
 </div>
 </div>
@@ -9564,7 +9950,7 @@ dtype: float64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [85]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [220]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">lr_objective</span><span class="p">(</span><span class="n">trial</span><span class="p">):</span>
@@ -9588,12 +9974,20 @@ dtype: float64
     <span class="k">return</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_val_np</span><span class="p">,</span> <span class="n">val_probs</span><span class="p">)</span>
 
 
+<span class="n">timer</span> <span class="o">=</span> <span class="n">PhaseTimer</span><span class="p">()</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
+
 <span class="n">study_lr</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span>
     <span class="n">direction</span><span class="o">=</span><span class="s1">'maximize'</span><span class="p">,</span>
     <span class="n">sampler</span><span class="o">=</span><span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">TPESampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
 <span class="p">)</span>
 
 <span class="n">study_lr</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">lr_objective</span><span class="p">,</span> <span class="n">n_trials</span><span class="o">=</span><span class="n">N_OPTUNA_TRIALS</span><span class="p">)</span>
+
+<span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
+
+<span class="n">optuna_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
 
 <span class="n">best_lr</span> <span class="o">=</span> <span class="n">study_lr</span><span class="o">.</span><span class="n">best_params</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Best Logistic Regression params:"</span><span class="p">)</span>
@@ -9623,10 +10017,13 @@ Best Logistic Regression params:
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [86]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [221]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"Training Logistic Regression across seeds..."</span><span class="p">)</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Training Logistic Regression across seeds..."</span><span class="p">)</span>
+
+<span class="n">train_time_total</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">inference_time_total</span> <span class="o">=</span> <span class="mi">0</span>
 
 <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">SEEDS</span><span class="p">:</span>
     <span class="n">set_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
@@ -9640,10 +10037,16 @@ Best Logistic Regression params:
         <span class="n">random_state</span><span class="o">=</span><span class="n">seed</span>
     <span class="p">)</span>
 
+    <span class="c1"># TRAINING TIME</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
     <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train_c</span><span class="p">,</span> <span class="n">y_train_np</span><span class="p">)</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
 
+    <span class="c1"># INFERENCE TIME</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
     <span class="n">preds</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test_c</span><span class="p">)</span>
     <span class="n">probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test_c</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
 
     <span class="n">acc</span><span class="p">,</span> <span class="n">auc</span><span class="p">,</span> <span class="n">f1</span> <span class="o">=</span> <span class="n">compute_classification_metrics</span><span class="p">(</span>
         <span class="n">y_test_np</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">probs</span>
@@ -9670,11 +10073,34 @@ Best Logistic Regression params:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Training Logistic Regression across seeds...
+<pre>
+Training Logistic Regression across seeds...
 Seed 42: Acc=0.8072, AUC=0.9052, F1=0.6765
 Seed 123: Acc=0.8072, AUC=0.9052, F1=0.6765
 Seed 456: Acc=0.8072, AUC=0.9052, F1=0.6765
 </pre>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=dbe87d62">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [222]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">train_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"train"</span><span class="p">)</span>
+<span class="n">inference_time</span> <span class="o">=</span> <span class="n">timer</span><span class="o">.</span><span class="n">get_total</span><span class="p">(</span><span class="s2">"inference"</span><span class="p">)</span>
+
+<span class="n">timing_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+    <span class="s1">'method'</span><span class="p">:</span> <span class="s1">'LogisticRegression'</span><span class="p">,</span>
+    <span class="s1">'optuna_time'</span><span class="p">:</span> <span class="n">optuna_time</span><span class="p">,</span>
+    <span class="s1">'train_time'</span><span class="p">:</span> <span class="n">train_time</span><span class="p">,</span>
+    <span class="s1">'inference_time'</span><span class="p">:</span> <span class="n">inference_time</span>
+<span class="p">})</span>
+</pre></div>
 </div>
 </div>
 </div>
@@ -9684,7 +10110,7 @@ Seed 456: Acc=0.8072, AUC=0.9052, F1=0.6765
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [87]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [223]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">results_lr</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">all_results</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'method'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'LogisticRegression'</span><span class="p">])</span>
@@ -9715,6 +10141,9 @@ Per-seed Logistic Regression results:
 0  LogisticRegression    42  0.807155  0.905206  0.676455
 1  LogisticRegression   123  0.807155  0.905206  0.676455
 2  LogisticRegression   456  0.807155  0.905206  0.676455
+3  LogisticRegression    42  0.807155  0.905206  0.676455
+4  LogisticRegression   123  0.807155  0.905206  0.676455
+5  LogisticRegression   456  0.807155  0.905206  0.676455
 
 Logistic Regression mean performance:
 accuracy    0.807155
@@ -9723,10 +10152,43 @@ f1          0.676455
 dtype: float64
 
 Logistic Regression std performance:
-accuracy    1.359740e-16
-auc         0.000000e+00
-f1          1.359740e-16
+accuracy    1.216188e-16
+auc         1.216188e-16
+f1          1.216188e-16
 dtype: float64
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a9e20c0f">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [224]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">timer</span><span class="o">.</span><span class="n">report</span><span class="p">(</span><span class="s2">"Logistic Regression"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>
+--- Bottleneck Report Logistic Regression ---
+optuna               4.014s (81.7%) avg 4014.45 ms
+train                0.873s (17.8%) avg 290.87 ms
+inference            0.026s (0.5%) avg 8.74 ms
+TOTAL: 4.913s
+
 </pre>
 </div>
 </div>
@@ -9748,7 +10210,7 @@ dtype: float64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [88]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [225]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">df_res</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">all_results</span><span class="p">)</span>
@@ -9791,12 +10253,60 @@ dtype: float64
 Final Model Comparison:
                            Accuracy          AUC-ROC               F1
 method                                                               
-LightGBM            0.8474 ± 0.0002  0.9261 ± 0.0001  0.7208 ± 0.0003
-XGBoost             0.8228 ± 0.0012  0.9257 ± 0.0000  0.7036 ± 0.0014
-RandomForest        0.8626 ± 0.0011  0.9158 ± 0.0005  0.6854 ± 0.0028
+LightGBM            0.8474 ± 0.0001  0.9261 ± 0.0001  0.7208 ± 0.0003
+XGBoost             0.8228 ± 0.0010  0.9257 ± 0.0000  0.7036 ± 0.0012
+RandomForest        0.8626 ± 0.0010  0.9158 ± 0.0004  0.6854 ± 0.0025
 FT-Transformer      0.8050 ± 0.0106  0.9101 ± 0.0004  0.6810 ± 0.0084
 LogisticRegression  0.8072 ± 0.0000  0.9052 ± 0.0000  0.6765 ± 0.0000
 ResNet              0.7898 ± 0.0016  0.9035 ± 0.0010  0.6679 ± 0.0012
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b5b97282">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [232]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">df_time</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">timing_results</span><span class="p">)</span>
+
+<span class="c1"># Format for display</span>
+<span class="n">df_time_display</span> <span class="o">=</span> <span class="n">df_time</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+<span class="n">df_time_display</span><span class="p">[</span><span class="s1">'Optuna (s)'</span><span class="p">]</span> <span class="o">=</span> <span class="n">df_time_display</span><span class="p">[</span><span class="s1">'optuna_time'</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+<span class="n">df_time_display</span><span class="p">[</span><span class="s1">'Train (s)'</span><span class="p">]</span> <span class="o">=</span> <span class="n">df_time_display</span><span class="p">[</span><span class="s1">'train_time'</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+<span class="n">df_time_display</span><span class="p">[</span><span class="s1">'Inference (s)'</span><span class="p">]</span> <span class="o">=</span> <span class="n">df_time_display</span><span class="p">[</span><span class="s1">'inference_time'</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+
+<span class="n">df_time_display</span> <span class="o">=</span> <span class="n">df_time_display</span><span class="p">[[</span><span class="s1">'method'</span><span class="p">,</span> <span class="s1">'Optuna (s)'</span><span class="p">,</span> <span class="s1">'Train (s)'</span><span class="p">,</span> <span class="s1">'Inference (s)'</span><span class="p">]]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">df_time_display</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>               method Optuna (s) Train (s) Inference (s)
+0             XGBoost      13.52      2.18          0.13
+1            LightGBM      20.04      2.26          1.05
+2        RandomForest      48.85      9.84          0.68
+3  LogisticRegression       4.13      0.93          0.03
+4              ResNet       4.13    179.59          0.29
+5      FT-Transformer    5335.48    410.95          1.04
+6             XGBoost       13.0      1.99          0.14
+7            LightGBM      16.17      2.18          1.05
+8        RandomForest      43.15      8.33          0.75
+9  LogisticRegression       4.01      0.87          0.03
 </pre>
 </div>
 </div>
@@ -9818,7 +10328,7 @@ ResNet              0.7898 ± 0.0016  0.9035 ± 0.0010  0.6679 ± 0.0012
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [89]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [227]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">methods</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'LightGBM'</span><span class="p">,</span> <span class="s1">'XGBoost'</span><span class="p">,</span> <span class="s1">'RandomForest'</span><span class="p">,</span>
@@ -9897,7 +10407,7 @@ ResNet              0.7898 ± 0.0016  0.9035 ± 0.0010  0.6679 ± 0.0012
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [97]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [228]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># FT-Transformer training curves</span>
@@ -9947,7 +10457,7 @@ ResNet              0.7898 ± 0.0016  0.9035 ± 0.0010  0.6679 ± 0.0012
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [95]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [229]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Top 15 LightGBM feature importance</span>
@@ -10001,7 +10511,7 @@ ResNet              0.7898 ± 0.0016  0.9035 ± 0.0010  0.6679 ± 0.0012
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [93]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [230]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">best_seed</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
@@ -10048,9 +10558,9 @@ ResNet              0.7898 ± 0.0016  0.9035 ± 0.0010  0.6679 ± 0.0012
 </div>
 </div>
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[93]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[230]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<style>#sk-container-id-1 {
+<style>#sk-container-id-2 {
   /* Definition of color scheme common for light and dark mode */
   --sklearn-color-text: #000;
   --sklearn-color-text-muted: #666;
@@ -10081,15 +10591,15 @@ ResNet              0.7898 ± 0.0016  0.9035 ± 0.0010  0.6679 ± 0.0012
   }
 }
 
-#sk-container-id-1 {
+#sk-container-id-2 {
   color: var(--sklearn-color-text);
 }
 
-#sk-container-id-1 pre {
+#sk-container-id-2 pre {
   padding: 0;
 }
 
-#sk-container-id-1 input.sk-hidden--visually {
+#sk-container-id-2 input.sk-hidden--visually {
   border: 0;
   clip: rect(1px 1px 1px 1px);
   clip: rect(1px, 1px, 1px, 1px);
@@ -10101,7 +10611,7 @@ ResNet              0.7898 ± 0.0016  0.9035 ± 0.0010  0.6679 ± 0.0012
   width: 1px;
 }
 
-#sk-container-id-1 div.sk-dashed-wrapped {
+#sk-container-id-2 div.sk-dashed-wrapped {
   border: 1px dashed var(--sklearn-color-line);
   margin: 0 0.4em 0.5em 0.4em;
   box-sizing: border-box;
@@ -10109,7 +10619,7 @@ ResNet              0.7898 ± 0.0016  0.9035 ± 0.0010  0.6679 ± 0.0012
   background-color: var(--sklearn-color-background);
 }
 
-#sk-container-id-1 div.sk-container {
+#sk-container-id-2 div.sk-container {
   /* jupyter's `normalize.less` sets `[hidden] { display: none; }`
      but bootstrap.min.css set `[hidden] { display: none !important; }`
      so we also need the `!important` here to be able to override the
@@ -10119,7 +10629,7 @@ ResNet              0.7898 ± 0.0016  0.9035 ± 0.0010  0.6679 ± 0.0012
   position: relative;
 }
 
-#sk-container-id-1 div.sk-text-repr-fallback {
+#sk-container-id-2 div.sk-text-repr-fallback {
   display: none;
 }
 
@@ -10135,14 +10645,14 @@ div.sk-item {
 
 /* Parallel-specific style estimator block */
 
-#sk-container-id-1 div.sk-parallel-item::after {
+#sk-container-id-2 div.sk-parallel-item::after {
   content: "";
   width: 100%;
   border-bottom: 2px solid var(--sklearn-color-text-on-default-background);
   flex-grow: 1;
 }
 
-#sk-container-id-1 div.sk-parallel {
+#sk-container-id-2 div.sk-parallel {
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -10150,28 +10660,28 @@ div.sk-item {
   position: relative;
 }
 
-#sk-container-id-1 div.sk-parallel-item {
+#sk-container-id-2 div.sk-parallel-item {
   display: flex;
   flex-direction: column;
 }
 
-#sk-container-id-1 div.sk-parallel-item:first-child::after {
+#sk-container-id-2 div.sk-parallel-item:first-child::after {
   align-self: flex-end;
   width: 50%;
 }
 
-#sk-container-id-1 div.sk-parallel-item:last-child::after {
+#sk-container-id-2 div.sk-parallel-item:last-child::after {
   align-self: flex-start;
   width: 50%;
 }
 
-#sk-container-id-1 div.sk-parallel-item:only-child::after {
+#sk-container-id-2 div.sk-parallel-item:only-child::after {
   width: 0;
 }
 
 /* Serial-specific style estimator block */
 
-#sk-container-id-1 div.sk-serial {
+#sk-container-id-2 div.sk-serial {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -10189,14 +10699,14 @@ clickable and can be expanded/collapsed.
 
 /* Pipeline and ColumnTransformer style (default) */
 
-#sk-container-id-1 div.sk-toggleable {
+#sk-container-id-2 div.sk-toggleable {
   /* Default theme specific background. It is overwritten whether we have a
   specific estimator or a Pipeline/ColumnTransformer */
   background-color: var(--sklearn-color-background);
 }
 
 /* Toggleable label */
-#sk-container-id-1 label.sk-toggleable__label {
+#sk-container-id-2 label.sk-toggleable__label {
   cursor: pointer;
   display: flex;
   width: 100%;
@@ -10209,13 +10719,13 @@ clickable and can be expanded/collapsed.
   gap: 0.5em;
 }
 
-#sk-container-id-1 label.sk-toggleable__label .caption {
+#sk-container-id-2 label.sk-toggleable__label .caption {
   font-size: 0.6rem;
   font-weight: lighter;
   color: var(--sklearn-color-text-muted);
 }
 
-#sk-container-id-1 label.sk-toggleable__label-arrow:before {
+#sk-container-id-2 label.sk-toggleable__label-arrow:before {
   /* Arrow on the left of the label */
   content: "▸";
   float: left;
@@ -10223,13 +10733,13 @@ clickable and can be expanded/collapsed.
   color: var(--sklearn-color-icon);
 }
 
-#sk-container-id-1 label.sk-toggleable__label-arrow:hover:before {
+#sk-container-id-2 label.sk-toggleable__label-arrow:hover:before {
   color: var(--sklearn-color-text);
 }
 
 /* Toggleable content - dropdown */
 
-#sk-container-id-1 div.sk-toggleable__content {
+#sk-container-id-2 div.sk-toggleable__content {
   max-height: 0;
   max-width: 0;
   overflow: hidden;
@@ -10238,12 +10748,12 @@ clickable and can be expanded/collapsed.
   background-color: var(--sklearn-color-unfitted-level-0);
 }
 
-#sk-container-id-1 div.sk-toggleable__content.fitted {
+#sk-container-id-2 div.sk-toggleable__content.fitted {
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-0);
 }
 
-#sk-container-id-1 div.sk-toggleable__content pre {
+#sk-container-id-2 div.sk-toggleable__content pre {
   margin: 0.2em;
   border-radius: 0.25em;
   color: var(--sklearn-color-text);
@@ -10251,79 +10761,79 @@ clickable and can be expanded/collapsed.
   background-color: var(--sklearn-color-unfitted-level-0);
 }
 
-#sk-container-id-1 div.sk-toggleable__content.fitted pre {
+#sk-container-id-2 div.sk-toggleable__content.fitted pre {
   /* unfitted */
   background-color: var(--sklearn-color-fitted-level-0);
 }
 
-#sk-container-id-1 input.sk-toggleable__control:checked~div.sk-toggleable__content {
+#sk-container-id-2 input.sk-toggleable__control:checked~div.sk-toggleable__content {
   /* Expand drop-down */
   max-height: 200px;
   max-width: 100%;
   overflow: auto;
 }
 
-#sk-container-id-1 input.sk-toggleable__control:checked~label.sk-toggleable__label-arrow:before {
+#sk-container-id-2 input.sk-toggleable__control:checked~label.sk-toggleable__label-arrow:before {
   content: "▾";
 }
 
 /* Pipeline/ColumnTransformer-specific style */
 
-#sk-container-id-1 div.sk-label input.sk-toggleable__control:checked~label.sk-toggleable__label {
+#sk-container-id-2 div.sk-label input.sk-toggleable__control:checked~label.sk-toggleable__label {
   color: var(--sklearn-color-text);
   background-color: var(--sklearn-color-unfitted-level-2);
 }
 
-#sk-container-id-1 div.sk-label.fitted input.sk-toggleable__control:checked~label.sk-toggleable__label {
+#sk-container-id-2 div.sk-label.fitted input.sk-toggleable__control:checked~label.sk-toggleable__label {
   background-color: var(--sklearn-color-fitted-level-2);
 }
 
 /* Estimator-specific style */
 
 /* Colorize estimator box */
-#sk-container-id-1 div.sk-estimator input.sk-toggleable__control:checked~label.sk-toggleable__label {
+#sk-container-id-2 div.sk-estimator input.sk-toggleable__control:checked~label.sk-toggleable__label {
   /* unfitted */
   background-color: var(--sklearn-color-unfitted-level-2);
 }
 
-#sk-container-id-1 div.sk-estimator.fitted input.sk-toggleable__control:checked~label.sk-toggleable__label {
+#sk-container-id-2 div.sk-estimator.fitted input.sk-toggleable__control:checked~label.sk-toggleable__label {
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-2);
 }
 
-#sk-container-id-1 div.sk-label label.sk-toggleable__label,
-#sk-container-id-1 div.sk-label label {
+#sk-container-id-2 div.sk-label label.sk-toggleable__label,
+#sk-container-id-2 div.sk-label label {
   /* The background is the default theme color */
   color: var(--sklearn-color-text-on-default-background);
 }
 
 /* On hover, darken the color of the background */
-#sk-container-id-1 div.sk-label:hover label.sk-toggleable__label {
+#sk-container-id-2 div.sk-label:hover label.sk-toggleable__label {
   color: var(--sklearn-color-text);
   background-color: var(--sklearn-color-unfitted-level-2);
 }
 
 /* Label box, darken color on hover, fitted */
-#sk-container-id-1 div.sk-label.fitted:hover label.sk-toggleable__label.fitted {
+#sk-container-id-2 div.sk-label.fitted:hover label.sk-toggleable__label.fitted {
   color: var(--sklearn-color-text);
   background-color: var(--sklearn-color-fitted-level-2);
 }
 
 /* Estimator label */
 
-#sk-container-id-1 div.sk-label label {
+#sk-container-id-2 div.sk-label label {
   font-family: monospace;
   font-weight: bold;
   display: inline-block;
   line-height: 1.2em;
 }
 
-#sk-container-id-1 div.sk-label-container {
+#sk-container-id-2 div.sk-label-container {
   text-align: center;
 }
 
 /* Estimator-specific */
-#sk-container-id-1 div.sk-estimator {
+#sk-container-id-2 div.sk-estimator {
   font-family: monospace;
   border: 1px dotted var(--sklearn-color-border-box);
   border-radius: 0.25em;
@@ -10333,18 +10843,18 @@ clickable and can be expanded/collapsed.
   background-color: var(--sklearn-color-unfitted-level-0);
 }
 
-#sk-container-id-1 div.sk-estimator.fitted {
+#sk-container-id-2 div.sk-estimator.fitted {
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-0);
 }
 
 /* on hover */
-#sk-container-id-1 div.sk-estimator:hover {
+#sk-container-id-2 div.sk-estimator:hover {
   /* unfitted */
   background-color: var(--sklearn-color-unfitted-level-2);
 }
 
-#sk-container-id-1 div.sk-estimator.fitted:hover {
+#sk-container-id-2 div.sk-estimator.fitted:hover {
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-2);
 }
@@ -10432,7 +10942,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 
 /* "?"-specific style due to the `<a>` HTML tag */
 
-#sk-container-id-1 a.estimator_doc_link {
+#sk-container-id-2 a.estimator_doc_link {
   float: right;
   font-size: 1rem;
   line-height: 1em;
@@ -10447,31 +10957,31 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   border: var(--sklearn-color-unfitted-level-1) 1pt solid;
 }
 
-#sk-container-id-1 a.estimator_doc_link.fitted {
+#sk-container-id-2 a.estimator_doc_link.fitted {
   /* fitted */
   border: var(--sklearn-color-fitted-level-1) 1pt solid;
   color: var(--sklearn-color-fitted-level-1);
 }
 
 /* On hover */
-#sk-container-id-1 a.estimator_doc_link:hover {
+#sk-container-id-2 a.estimator_doc_link:hover {
   /* unfitted */
   background-color: var(--sklearn-color-unfitted-level-3);
   color: var(--sklearn-color-background);
   text-decoration: none;
 }
 
-#sk-container-id-1 a.estimator_doc_link.fitted:hover {
+#sk-container-id-2 a.estimator_doc_link.fitted:hover {
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div class="sk-top-container" id="sk-container-id-1"><div class="sk-text-repr-fallback"><pre>LGBMClassifier(colsample_bytree=0.8144754354791038,
+</style><div class="sk-top-container" id="sk-container-id-2"><div class="sk-text-repr-fallback"><pre>LGBMClassifier(colsample_bytree=0.8144754354791038,
                learning_rate=0.02847748683027988, metric='auc',
                min_child_samples=32, n_estimators=478, n_jobs=-1, num_leaves=20,
                objective='binary', random_state=123,
                reg_alpha=1.368174031940222e-08, reg_lambda=0.003327054963436224,
                scale_pos_weight=2.2968016075731468, subsample=0.751180619986081,
-               verbosity=-1)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br/>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input checked="" class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox"/><label class="sk-toggleable__label fitted sk-toggleable__label-arrow" for="sk-estimator-id-1"><div><div>LGBMClassifier</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>LGBMClassifier(colsample_bytree=0.8144754354791038,
+               verbosity=-1)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br/>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input checked="" class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox"/><label class="sk-toggleable__label fitted sk-toggleable__label-arrow" for="sk-estimator-id-2"><div><div>LGBMClassifier</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>LGBMClassifier(colsample_bytree=0.8144754354791038,
                learning_rate=0.02847748683027988, metric='auc',
                min_child_samples=32, n_estimators=478, n_jobs=-1, num_leaves=20,
                objective='binary', random_state=123,
@@ -10487,7 +10997,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [94]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [231]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">shap</span>
@@ -10534,7 +11044,7 @@ thanks to their ability to handle mixed numerical/categorical features.</li>
 <li><strong>FT-Transformer</strong> leverages embeddings for categorical features, which can
 yield competitive AUC with sufficient training.</li>
 <li><strong>Logistic Regression</strong> provides a fast and interpretable baseline.</li>
-<li><strong>TabNet</strong> and <strong>Random Forest</strong> round out the comparison.</li>
+<li><strong>ResNet</strong> and <strong>Random Forest</strong> round out the comparison.</li>
 </ul>
 <h3 id="Observations">Observations<a class="anchor-link" href="#Observations">¶</a></h3><ul>
 <li>The dataset is moderately imbalanced (~24% positive); AUC-ROC is the most

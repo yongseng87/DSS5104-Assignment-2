@@ -41,9 +41,9 @@ DSS5104-Assignment-2/
 ├── dataset1_results/                               # Output charts for Dataset 1
 ├── dataset2_results/                               # Output charts for Dataset 2
 ├── dataset3_results/                               # Output charts for Dataset 3
-├── dataset1_california_housing_goris.ipynb         # Notebook 1: California Housing (Regression)
-├── dataset2_adult_income_goris.ipynb               # Notebook 2: Adult Income (Classification)
-├── dataset3_porto_seguro_goris.ipynb               # Notebook 3: Porto Seguro (Classification)
+├── dataset1_california_housing.ipynb         # Notebook 1: California Housing (Regression)
+├── dataset2_adult_income.ipynb               # Notebook 2: Adult Income (Classification)
+├── dataset3_porto_seguro.ipynb               # Notebook 3: Porto Seguro (Classification)
 ├── requirements.txt
 └── README.md
 ```
@@ -156,14 +156,14 @@ Then run the notebooks in order (or independently — they are self-contained):
 
 | Notebook | Dataset | Task |
 |----------|---------|------|
-| `dataset1_california_housing_goris.ipynb` | California Housing | Regression |
-| `dataset2_adult_income_goris.ipynb` | Adult Income | Binary Classification |
-| `dataset3_porto_seguro_goris.ipynb` | Porto Seguro | Binary Classification |
+| `dataset1_california_housing.ipynb` | California Housing | Regression |
+| `dataset2_adult_income.ipynb` | Adult Income | Binary Classification |
+| `dataset3_porto_seguro.ipynb` | Porto Seguro | Binary Classification |
 
 To run a notebook non-interactively from the command line:
 
 ```bash
-jupyter nbconvert --to notebook --execute dataset1_california_housing_goris.ipynb --output dataset1_california_housing_goris_executed.ipynb
+jupyter nbconvert --to notebook --execute dataset1_california_housing.ipynb --output dataset1_california_housing_executed.ipynb
 ```
 
 > **Note:** Running all experiments (Optuna tuning × 6 models × 3 seeds) can take a significant amount of time, especially for deep learning models. A GPU is strongly recommended. Estimated runtimes vary by hardware.
